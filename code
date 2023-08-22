@@ -1,0 +1,220 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h> //Biblioteca para trabalhar com tempo e números aleatórios.
+#include <locale.h>
+#include <ctype.h>
+
+#define MAX_PERGUNTAS 20 //Número máximo de perguntas permitidas no jogo.
+#define MAX_CARACTERES 100 //Número máximo de caracteres permitidos em uma pergunta.
+
+typedef struct {
+    char pergunta[MAX_CARACTERES]; //Vetor responsável por armazenar a pergunta.
+    char opcoes[4][MAX_CARACTERES]; //Matriz responsável por armazenar 4 opções de resposta.
+    char resposta; //Char responsável por guardar a alternativa de resposta.
+}Pergunta; //Struct que define pergunta, respostas e opções de repostas.
+
+//Função responsável por copiar a pergunta de dentro do arquivo para o Vetor de Pergunta.
+void carregarPerguntas(Pergunta perguntas[]){
+    FILE *arquivo; //Cria o arquivo.
+    char linha[MAX_CARACTERES];
+    int i = 0;
+
+    arquivo = fopen("perguntas.txt", "r"); //Abre o arquivo de perguntas no modo de leitura
+    if(arquivo == NULL){
+        printf("Erro ao abrir o arquivo de perguntas.\n"); //Mostra uma mensagem de erro se o aarquivo não for encontrado.
+        exit(1); //Encerra o programa com código de erro.
+    }
+
+    //Lê as perguntas do arquivo
+    while(i < MAX_PERGUNTAS && fgets(linha, sizeof(linha), arquivo)){ //Repetição para copiar a pergunta do arquivo para o Vetor.
+        linha[strcspn(linha, "\n")] = '\0'; //Remove o caractere de nova linha "\n" da string lida.
+        strcpy(perguntas[i].pergunta, linha); //Copia a pergunta para a estrutura de perguntas.
+
+        for(int j = 0; j < 4; j++){
+            fgets(linha, sizeof(linha), arquivo);
+            linha[strcspn(linha, "\n")] = '\0';
+            strcpy(perguntas[i].opcoes[j], linha); //Copia as opções de resposta para a estrutura de perguntas.
+        }
+
+        fgets(linha, sizeof(linha), arquivo);
+        perguntas[i].resposta = linha[0]; //Armazena a resposta correta na estrutura de perguntas.
+        i++;
+    }
+
+    fclose(arquivo); //Fecha o arquivo após terminar a leitura.
+
+    //Embaralha as perguntas.
+    srand(time(NULL)); //Inicializa a semente do gerador de números aleatórios com base no tempo atual.
+    for (int i = 0; i < MAX_PERGUNTAS - 1; i++) {
+        int j = i + rand() % (MAX_PERGUNTAS - i); //Gera um índice aleatório dentro do intervalo não processado.
+        Pergunta temp = perguntas[j]; //Armazena temporariamente a pergunta na posição atual.
+        perguntas[j] = perguntas[i]; //Substitui a pergunta atual com a pergunta na posição aleatória.
+        perguntas[i] = temp; //Substitui a pergunta na posição aleatória com a pergunta armazenada temporariamente.
+    }
+}
+
+//Responsável por exibir as perguntas e alternativas.
+void exibirPergunta(Pergunta pergunta){
+    printf("%s\n", pergunta.pergunta);
+    for(int i = 0; i < 4; i++){
+        printf("%s\n", pergunta.opcoes[i]);
+    }
+    printf("Escolha a opção correta (A, B, C ou D): ");
+}
+
+int main(){
+    setlocale(LC_ALL, "");
+
+    Pergunta perguntas[MAX_PERGUNTAS];
+    int pontuacao = 0;
+    int valores[MAX_PERGUNTAS] = {1000, 5000, 50000, 100000, 300000, 500000, 1000000}; //Vetor responsável por guardar valores de respostas certas.
+    int valoresPerda[MAX_PERGUNTAS] = {0, 500, 2500, 25000, 50000, 150000, 0};//Vetor responsável por guardar valores de respostas erradas.
+    int valoresParada[MAX_PERGUNTAS] = {500, 2500, 25000, 50000, 150000, 0}; //Vetor responsável por guardar valores de parar programa.
+    int eliminacoes = 0; //Armazena quantidade de eliminações de respostas erradas (Máximo: 1).
+    int q=1,k=0,i;
+
+    carregarPerguntas(perguntas); //Função para copiar a pergunta do arquivo para o Vetor.
+
+    printf("Bem-vindo ao Show do Milhão!\n");
+    printf(" P: parar o jogo\n");
+    printf(" E: eliminar duas alternativas\n");
+
+    int respostaIncorreta = 0; //Variável de controle para verificar se a resposta está correta.
+    for(i = 0; i < 7; i++){
+        if(k == 0){
+            printf("--------------------------------------------------\n");
+            printf("Valor da primeira pergunta: R$ %d\n", valores[i]);
+            printf("--------------------------------------------------\n");
+            k++;
+        }
+        printf("%d) ",q); //Número da questão.
+        exibirPergunta(perguntas[i]); //Função para exibir as perguntas.
+        q++;
+
+        char opcao, opcaotemp;
+        scanf(" %c", &opcaotemp); //Variável responsável por armazenar a resposta.
+        (isalpha(opcaotemp))?opcao=tolower(opcaotemp):printf("ERROR"); //Função responsável por verificar se uma letra foi digitada.
+
+        //Verifica possíveis respostas para a pergunta.
+        while(opcao!='p' && opcao!='e' && opcao!='a' && opcao!='b' && opcao!='c' && opcao!='d'){
+            printf("Digite uma opcão válida!\n");
+            scanf(" %c", &opcaotemp);
+            (isalpha(opcaotemp))?opcao=tolower(opcaotemp):printf("ERROR");
+        }
+
+        //Caso o usuário queira parar o jogo.
+        if(opcao == 'P' || opcao == 'p'){
+            printf("Você escolheu parar o jogo.\n");
+            printf("Você ficou com R$ %d",valores[i-1]); //Mostra o valor ganho na rodada passada.
+            break;
+
+        //Caso o usuário queira pedir ajuda.
+        }else if (opcao == 'E' || opcao == 'e'){
+            if(eliminacoes < 1){
+                eliminacoes++; // Incrementa que a opção de Pedir Ajuda foi usada.
+                printf("--------------------------------------------------\n");
+                printf("Você escolheu eliminar duas alternativas incorretas.\n");
+                printf("--------------------------------------------------\n");
+
+                //Exibir a pergunta com duas alternativas incorretas eliminadas.
+                int opcoesEliminadas[4] = {0};
+                int eliminadas = 0;
+
+                for(int j = 0; j < 4; j++){
+                    //Verifica se o programa não excluirá a resposta correta.
+                    if(perguntas[i].opcoes[j][0] != perguntas[i].resposta && eliminadas < 2){
+                        opcoesEliminadas[j] = 1;
+                        eliminadas++;
+                    }
+                }
+
+                for(int j = 0; j < 4; j++){
+                    if(!opcoesEliminadas[j]){
+                        printf("%s\n", perguntas[i].opcoes[j]); //Printa as opções que não foram excluidas.
+                    }
+                }
+
+                char respostatemp,resposta;
+                printf("Escolha a opção correta (A, B, C ou D): ");
+                scanf(" %c", &respostatemp);
+                (isalpha(respostatemp))?resposta=tolower(respostatemp):printf("ERROR");
+
+                // Verifica novamente se o usuário digitou a opção de Pedir Ajuda.
+                while(resposta=='e'||resposta=='E'){
+                    if(resposta=='e'||'E'){
+                        printf("--------------------------------------------------\n");
+                        printf("Você já utilizou a eliminação de alternativas.\n");
+                        printf("--------------------------------------------------\n");
+                        printf("Pergunta valendo:R$ %d\n",valores[i]); //Pontuação da pergunta atual.
+                        printf("Ganhos até agora: R$ %d\n", pontuacao); //Pontuação atual.
+                        printf("Ganhos se parar agora: R$ %d\n", valores[i]); //Caso o usuário deseje parar.
+                        printf("Ganhos se errar a resposta: R$ %d\n", valoresPerda[i]); //Caso o usuário erre.
+                        printf("--------------------------------------------------\n\n");
+
+                for(int j = 0; j < 4; j++){
+                    if(!opcoesEliminadas[j]){
+                        printf("%s\n", perguntas[i].opcoes[j]);
+                    }
+                }
+
+                printf("Escolha a opção correta (A, B, C ou D): ");
+                scanf(" %c", &respostatemp);
+                (isalpha(respostatemp))?resposta=tolower(respostatemp):printf("ERROR"); //Repete para o usuário digitar novamente as alternativas.
+                    }
+                }
+
+                //Verifica se a resposta está correta.
+                if(resposta == perguntas[i].resposta){
+                    printf("Resposta correta!\n");
+                    pontuacao = valores[i];
+
+                // Caso a resposta esteja errada.
+                }else{
+                    printf("--------------------------------------------------\n");
+                    printf("Resposta incorreta!\n");
+                    pontuacao -= valoresPerda[i];
+                    printf("Pontuacao final: R$ %d",pontuacao);
+                    respostaIncorreta = 1; //Define a resposta como incorreta.
+                    break;
+                }
+            }else{
+                printf("--------------------------------------------------\n");
+                printf("Você já utilizou a eliminação de alternativas.\n");
+                i--; //Repete a mesma pergunta para o jogador responder novamente.
+                q--; //Quando a pergunta for repetida, garantir que ela mantenha a numeração correta.
+            }
+        }else if(opcao == perguntas[i].resposta){
+            printf("Resposta correta!\n");
+            pontuacao = valores[i];
+        }else{
+            printf("--------------------------------------------------\n");
+            printf("Resposta incorreta!\n");
+            pontuacao -= valoresPerda[i];
+            printf("Você ficou com R$ %d\n",pontuacao);
+            printf("--------------------------------------------------\n");
+            respostaIncorreta = 1; //Define a resposta como incorreta.
+            break; //Encerra o jogo imediatamente após uma resposta incorreta.
+        }
+
+        // Verifica se a pontuação atual não está em R$1.000.000,00.
+        if(pontuacao!=1000000){
+            printf("--------------------------------------------------\n");
+            printf("Pergunta valendo:R$ %d\n",valores[i+1]);
+            printf("Ganhos até agora: R$ %d\n", pontuacao);
+            printf("Ganhos se parar agora: R$ %d\n", valores[i]);
+
+        //Caso a pontuação atual chegue à R$1.000.000,00
+        }else{
+            printf("--------------------------------------------------\n");
+            printf("Parabéns!!  Você ganhou R$1.000.000,00 milhão!!\n");
+            printf("--------------------------------------------------\n");
+        }
+        if(i < 7 - 1){
+            printf("Ganhos se errar a resposta: R$ %d\n", valoresPerda[i + 1]); //Printa quanto o usuário ganhará caso erre a resposta.
+        }
+        printf("--------------------------------------------------\n");
+    }
+
+    return 0;
+}
